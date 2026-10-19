@@ -19,6 +19,12 @@ TCMALLOC_LIB/
 # Python artifacts
 **/*.pyc
 
+# Python packaging artifacts (rebuilt by lang/python/setup_pip.py / uv sync)
+/lang/python/dist/
+/lang/python/stage/
+/cmake_pip_build/
+*.egg-info/
+
 # CLion related files & directories
 .idea
 cmake-build-release

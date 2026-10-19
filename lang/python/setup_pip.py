@@ -217,6 +217,23 @@ if pip_command == 'sdist':
             shutil.copy2(src, os.path.join(stage_dir, '__init__.py'))
         else:
             shutil.copy2(src, os.path.join(stage_dir, basename))
+    # Type stubs and the PEP 561 py.typed marker (generated from the runtime
+    # by tools/generate_wiredtiger_stubs.py) can be untracked in git and are
+    # therefore not staged by the loop above; copy them from the source tree.
+    for basename in ('__init__.pyi', 'swig_wiredtiger.pyi', '_wiredtiger.pyi',
+            'py.typed'):
+        src = os.path.join(this_dir, 'wiredtiger', basename)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(stage_dir, basename))
+        else:
+            die('missing type stub: ' + src +
+                ', run tools/generate_wiredtiger_stubs.py')
+    # List them explicitly so they are included in the source distribution.
+    with open(os.path.join(stage_dir, 'MANIFEST.in'), 'w') as manifest:
+        manifest.write('include __init__.pyi\n')
+        manifest.write('include py.typed\n')
+        manifest.write('include swig_wiredtiger.pyi\n')
+        manifest.write('include _wiredtiger.pyi\n')
     os.chdir(stage_dir)
     sys.argv.append('--dist-dir=' + os.path.join('..', 'dist'))
 else:
@@ -290,7 +307,7 @@ setup(
     package_dir = { 'wiredtiger' : '.' },
     cmdclass = { 'install': WTInstall, 'build_ext': WTBuildExt },
     package_data = {
-        'wiredtiger' : [ '*.py']
+        'wiredtiger' : [ '*.py', '*.pyi', 'py.typed']
     },
     classifiers=[
         'Intended Audience :: Developers',
