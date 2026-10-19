@@ -269,13 +269,31 @@ class BinaryDistribution(Distribution):
     def is_pure(self):
         return False
 
+# find_swig_module --
+#   The swig-generated python module lands in different places depending on
+#   the toolchain (beside the package as wiredtiger.py, or inside it as
+#   wiredtiger/swig_wiredtiger.py); locate whichever exists.
+def find_swig_module():
+    for candidate in (
+            os.path.join(wt_dir, conf_make_dir, python_rel_dir, 'wiredtiger.py'),
+            os.path.join(wt_dir, conf_make_dir, python_rel_dir, 'wiredtiger',
+                         'swig_wiredtiger.py')):
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
 class WTInstall(setuptools.command.install.install):
     def run(self):
         self.run_command("build_ext")
         # Copy the SWIG generated python module to our build directory. This will
         # then subsequently be installed by pip into the package directory.
-        shutil.move(os.path.join(conf_make_dir, python_rel_dir, 'wiredtiger.py'),
-            os.path.join(self.build_lib, 'wiredtiger','swig_wiredtiger.py'))
+        swig_module = find_swig_module()
+        pkg_swig = os.path.join(self.build_lib, 'wiredtiger',
+                                'swig_wiredtiger.py')
+        if swig_module is not None and not os.path.isfile(pkg_swig):
+            shutil.move(swig_module, pkg_swig)
+        elif swig_module is None and not os.path.isfile(pkg_swig):
+            msg('swig module not found in cmake tree, package may be incomplete')
         return setuptools.command.install.install.run(self)
 
 class WTBuildPy(setuptools.command.build_py.build_py):
@@ -314,14 +332,17 @@ class WTBuildExt(setuptools.command.build_ext.build_ext):
             msg('stub generator missing, keeping packaged stubs: ' + script)
             return
         pkg_dir = os.path.join(self.build_lib, 'wiredtiger')
-        swig_py = os.path.join(wt_dir, conf_make_dir, python_rel_dir,
-                               'wiredtiger.py')
+        swig_py = find_swig_module()
         if not os.path.isfile(os.path.join(pkg_dir, 'swig_wiredtiger.py')) \
-                and os.path.isfile(swig_py):
+                and swig_py is not None:
             # The swig module is generated into the cmake tree; copy it into
             # build_lib so stubgen sees the full package. The install command
             # moves the same file for non-wheel flows, so the source must stay.
+            msg('copying swig module: ' + swig_py)
             shutil.copy2(swig_py, os.path.join(pkg_dir, 'swig_wiredtiger.py'))
+        elif swig_py is None:
+            msg('swig module not found in cmake tree, '
+                'stub generation will fall back to packaged stubs')
         env = dict(os.environ)
         env['PYTHONPATH'] = self.build_lib + os.pathsep + \
             env.get('PYTHONPATH', '')

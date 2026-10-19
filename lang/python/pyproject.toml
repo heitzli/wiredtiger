@@ -3,7 +3,8 @@
 # metadata itself lives in setup_pip.py. mypy is required at build time so the
 # stub generator can run against the freshly built extension; the generator's
 # committed output is used as a fallback when mypy is unavailable
-# (--no-build-isolation).
+# (--no-build-isolation). A floor instead of a pin: the build environment must
+# be resolvable on future Python releases too.
 [build-system]
-requires = ["setuptools>=64", "wheel", "mypy==2.4.0"]
+requires = ["setuptools>=64", "wheel", "mypy>=2.4.0"]
 build-backend = "setuptools.build_meta"

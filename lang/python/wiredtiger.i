@@ -240,7 +240,8 @@ from packing import pack, unpack
     results_array = $1;
     $result = PyList_New(*$2);
     for (n = 0; n < *$2; n++) {
-        PyBytesObject *pbo = PyBytes_FromStringAndSize(results_array[n].data, results_array[n].size);
+        PyObject *pbo = PyBytes_FromStringAndSize(
+            (const char *)results_array[n].data, results_array[n].size);
         PyList_SetItem($result, (int)n, pbo);
     }
     /* Free in reverse order, since the first item might hold all the memory used by other items. */
@@ -856,21 +857,21 @@ OVERRIDE_METHOD(__wt_page_log, WT_PAGE_LOG, get_open_checkpoint, (self))
 }
 
 /* Handle binary data input from FILE_HANDLE->fh_write. */
-%typemap(in,numinputs=1) (size_t length, const void *buf) (Py_ssize_t length, const void *buf = NULL) {
-    if (PyBytes_AsStringAndSize($input, &buf, &length) < 0)
+%typemap(in,numinputs=1) (size_t length, const void *buf) (Py_ssize_t length, char *bufp = NULL) {
+    if (PyBytes_AsStringAndSize($input, &bufp, &length) < 0)
         SWIG_exception_fail(SWIG_AttributeError,
           "bad bytes input argument");
     $1 = length;
-    $2 = buf;
+    $2 = bufp;
 }
 
 /* Handle binary data input from FILE_HANDLE->fh_read. */
-%typemap(in,numinputs=1) (size_t length, void *buf) (Py_ssize_t length, const void *buf = NULL) {
-      if (PyBytes_AsStringAndSize($input, &buf, &length) < 0)
+%typemap(in,numinputs=1) (size_t length, void *buf) (Py_ssize_t length, char *bufp = NULL) {
+      if (PyBytes_AsStringAndSize($input, &bufp, &length) < 0)
           SWIG_exception_fail(SWIG_AttributeError,
             "bad bytes input argument");
     $1 = length;
-    $2 = buf;
+    $2 = bufp;
 }
 
 /* Handle record number returns from get_recno */
@@ -1695,14 +1696,14 @@ freeModifyArray(WT_MODIFY *modarray)
 
 static int unpackBytesOrString(PyObject *obj, void **datap, size_t *sizep)
 {
-    void *data;
+    char *data;
     Py_ssize_t sz;
 
     if (PyBytes_AsStringAndSize(obj, &data, &sz) < 0) {
 #if PY_VERSION_HEX >= 0x03000000
         PyErr_Clear();
-        if ((data = PyUnicode_AsUTF8AndSize(obj, &sz)) != 0)
-            *sizep = strlen((char *)data) + 1;
+        if ((data = (char *)PyUnicode_AsUTF8AndSize(obj, &sz)) != 0)
+            *sizep = strlen(data) + 1;
         else
 #endif
             return (-1);
