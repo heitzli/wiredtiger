@@ -1,0 +1,9 @@
+# Consumed by PEP 517 frontends (pip/uv) when building the wheel from this
+# directory (e.g. `uv add git+...#subdirectory=lang/python`). The project
+# metadata itself lives in setup_pip.py. mypy is required at build time so the
+# stub generator can run against the freshly built extension; the generator's
+# committed output is used as a fallback when mypy is unavailable
+# (--no-build-isolation).
+[build-system]
+requires = ["setuptools>=64", "wheel", "mypy==2.4.0"]
+build-backend = "setuptools.build_meta"

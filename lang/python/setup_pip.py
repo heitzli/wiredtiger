@@ -39,6 +39,7 @@ import subprocess
 from subprocess import call
 import setuptools.command.install
 import setuptools.command.build_ext
+import setuptools.command.build_py
 
 # msg --
 #   Print a message to stderr.
@@ -218,7 +219,7 @@ if pip_command == 'sdist':
         else:
             shutil.copy2(src, os.path.join(stage_dir, basename))
     # Type stubs and the PEP 561 py.typed marker (generated from the runtime
-    # by tools/generate_wiredtiger_stubs.py) can be untracked in git and are
+    # by tools/wiredtiger_stubgen.py) can be untracked in git and are
     # therefore not staged by the loop above; copy them from the source tree.
     for basename in ('__init__.pyi', 'swig_wiredtiger.pyi', '_wiredtiger.pyi',
             'py.typed'):
@@ -227,13 +228,23 @@ if pip_command == 'sdist':
             shutil.copy2(src, os.path.join(stage_dir, basename))
         else:
             die('missing type stub: ' + src +
-                ', run tools/generate_wiredtiger_stubs.py')
+                ', run lang/python/tools/wiredtiger_stubgen.py')
+    # Ship the stub generator at the location the wheel build (setup_pip.py
+    # run from the distribution root) expects it, together with the PEP 517
+    # build-system config that makes build isolation install mypy. The
+    # committed stubs remain as a fallback when mypy is unavailable.
+    os.makedirs(os.path.join(stage_dir, 'tools'), exist_ok=True)
+    shutil.copy2(os.path.join(this_dir, 'tools', 'wiredtiger_stubgen.py'),
+        os.path.join(stage_dir, 'tools', 'wiredtiger_stubgen.py'))
+    shutil.copy2(os.path.join(this_dir, 'pyproject.toml'),
+        os.path.join(stage_dir, 'pyproject.toml'))
     # List them explicitly so they are included in the source distribution.
     with open(os.path.join(stage_dir, 'MANIFEST.in'), 'w') as manifest:
         manifest.write('include __init__.pyi\n')
         manifest.write('include py.typed\n')
         manifest.write('include swig_wiredtiger.pyi\n')
         manifest.write('include _wiredtiger.pyi\n')
+        manifest.write('include tools/wiredtiger_stubgen.py\n')
     os.chdir(stage_dir)
     sys.argv.append('--dist-dir=' + os.path.join('..', 'dist'))
 else:
@@ -267,9 +278,59 @@ class WTInstall(setuptools.command.install.install):
             os.path.join(self.build_lib, 'wiredtiger','swig_wiredtiger.py'))
         return setuptools.command.install.install.run(self)
 
+class WTBuildPy(setuptools.command.build_py.build_py):
+    def run(self):
+        setuptools.command.build_py.build_py.run(self)
+        # Assemble the runtime package from lang/python/wiredtiger regardless
+        # of which directory the build was launched from (sdist root staged
+        # this directory as '.', a git+subdirectory=lang/python build leaves
+        # it in place). The default pass already covers the sdist layout; the
+        # explicit copies make the git layout work and are identical files.
+        src = os.path.join(wt_dir, python_rel_dir, 'wiredtiger')
+        dst = os.path.join(self.build_lib, 'wiredtiger')
+        os.makedirs(dst, exist_ok=True)
+        for name in os.listdir(src):
+            base = '__init__.py' if name == 'init.py' else name
+            if base.endswith(('.py', '.pyi')) or base == 'py.typed':
+                shutil.copy2(os.path.join(src, name), os.path.join(dst, base))
+
 class WTBuildExt(setuptools.command.build_ext.build_ext):
     def __init__(self, *args, **kwargs):
         setuptools.command.build_ext.build_ext.__init__(self, *args, **kwargs)
+
+    # build_stubs --
+    #   Regenerate the PEP 561 stubs against the freshly built extension:
+    #   the generator introspects whatever `wiredtiger` is importable, so it
+    #   runs with PYTHONPATH pointing at build_lib (which holds the complete
+    #   flat package layout at this point). The copies build_py staged are
+    #   kept as the fallback and survive when generation is unavailable
+    #   (e.g. --no-build-isolation without mypy).
+    def build_stubs(self):
+        if os.environ.get('WT_SKIP_STUBGEN'):
+            msg('WT_SKIP_STUBGEN set, keeping packaged stubs')
+            return
+        script = os.path.join(this_dir, 'tools', 'wiredtiger_stubgen.py')
+        if not os.path.isfile(script):
+            msg('stub generator missing, keeping packaged stubs: ' + script)
+            return
+        pkg_dir = os.path.join(self.build_lib, 'wiredtiger')
+        swig_py = os.path.join(wt_dir, conf_make_dir, python_rel_dir,
+                               'wiredtiger.py')
+        if not os.path.isfile(os.path.join(pkg_dir, 'swig_wiredtiger.py')) \
+                and os.path.isfile(swig_py):
+            # The swig module is generated into the cmake tree; copy it into
+            # build_lib so stubgen sees the full package. The install command
+            # moves the same file for non-wheel flows, so the source must stay.
+            shutil.copy2(swig_py, os.path.join(pkg_dir, 'swig_wiredtiger.py'))
+        env = dict(os.environ)
+        env['PYTHONPATH'] = self.build_lib + os.pathsep + \
+            env.get('PYTHONPATH', '')
+        msg('generating type stubs into ' + pkg_dir)
+        result = subprocess.run(
+            [sys.executable, script, '--fork', wt_dir, pkg_dir],
+            env=env)
+        if result.returncode != 0:
+            msg('stub generation failed, keeping packaged stubs')
 
     def run(self):
         # only run this once
@@ -287,7 +348,9 @@ class WTBuildExt(setuptools.command.build_ext.build_ext):
                 lambda: build_commands(make_cmds, wt_dir, env), [],
                 'wiredtiger make')
             open(built_sentinal, 'a').close()
-        return setuptools.command.build_ext.build_ext.run(self)
+        return_value = setuptools.command.build_ext.build_ext.run(self)
+        self.build_stubs()
+        return return_value
 
 setup(
     name = 'wiredtiger',
@@ -305,7 +368,8 @@ setup(
     include_package_data = True,
     distclass = BinaryDistribution,
     package_dir = { 'wiredtiger' : '.' },
-    cmdclass = { 'install': WTInstall, 'build_ext': WTBuildExt },
+    cmdclass = { 'install': WTInstall, 'build_ext': WTBuildExt,
+                 'build_py': WTBuildPy },
     package_data = {
         'wiredtiger' : [ '*.py', '*.pyi', 'py.typed']
     },
