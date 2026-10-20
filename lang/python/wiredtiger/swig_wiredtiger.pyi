@@ -1,4 +1,5 @@
 from typing import Any, Callable
+import types
 from _typeshed import Incomplete
 from ._wiredtiger import WiredTigerError as WiredTigerError, WiredTigerRollbackError as WiredTigerRollbackError, diagnostic_build as diagnostic_build, standalone_build as standalone_build, wiredtiger_get_verbose_categories as wiredtiger_get_verbose_categories, wiredtiger_open as wiredtiger_open, wiredtiger_repair as wiredtiger_repair, wiredtiger_strerror as wiredtiger_strerror, wiredtiger_version as wiredtiger_version
 from typing import ClassVar
@@ -246,6 +247,11 @@ class Cursor:
         """Python convenience for searching"""
     def __setitem__(self, key, value) -> None:
         """Python convenience for inserting"""
+    def __enter__(self) -> "Cursor":
+        """Cursor objects support the context manager protocol; the cursor
+                is closed on exit."""
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+        """Close the cursor on exit; exceptions are not suppressed."""
     @property
     def session(self):
         """session
@@ -306,6 +312,11 @@ class Session:
         @param session the session handle
         @configempty{WT_SESSION.close, see dist/api_data.py}
         @errors"""
+    def __enter__(self) -> "Session":
+        """Sessions support the context manager protocol; the session is
+                closed on exit."""
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+        """Close the session on exit; exceptions are not suppressed."""
     def log_printf(self, *args: Any) -> int:
         """Insert a ::WT_LOGREC_MESSAGE type record in the database log files
         (the database must be configured for logging when this method is
@@ -367,6 +378,11 @@ class Connection:
         default \\c true.}
         @configend
         @errors"""
+    def __enter__(self) -> "Connection":
+        """Connections support the context manager protocol; the connection
+                is closed on exit."""
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+        """Close the connection on exit; exceptions are not suppressed."""
 WT_EVENT_COMPACT_CHECK: int
 WT_EVENT_CONN_CLOSE: int
 WT_EVENT_CONN_READY: int

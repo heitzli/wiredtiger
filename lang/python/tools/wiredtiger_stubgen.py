@@ -80,6 +80,13 @@ _SIGNATURE_LINES: dict[tuple[str, str], str] = {
     ("Session", "close"):
         f'def close(self, config: {_t} = ..., /) -> int: ...',
 }
+for _cls in ("Connection", "Session", "Cursor"):
+    # Context manager protocol (pythoncode in wiredtiger.i).
+    _SIGNATURE_LINES[(_cls, "__enter__")] = \
+        f'def __enter__(self) -> "{_cls}": ...'
+    _SIGNATURE_LINES[(_cls, "__exit__")] = \
+        ('def __exit__(self, exc_type: type[BaseException] | None, '
+         'exc_val: BaseException | None, exc_tb: Any) -> None: ...')
 for _key in (("Session", "create"), ("Session", "drop"),
              ("Session", "alter"), ("Session", "compact"),
              ("Session", "salvage"), ("Session", "verify"),

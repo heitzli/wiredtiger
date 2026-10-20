@@ -1188,6 +1188,16 @@ typedef int int_void;
         self.set_value(value)
         if self.insert() != 0:
             raise KeyError
+
+    def __enter__(self):
+        '''Cursor objects support the context manager protocol; the cursor
+        is closed on exit.'''
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        '''Close the cursor on exit; exceptions are not suppressed.'''
+        self.close()
+        return False
 %}
 };
 
@@ -1217,12 +1227,36 @@ typedef int int_void;
     int _clear() {
         return (sessionClearHandler($self));
     }
+
+%pythoncode %{
+    def __enter__(self):
+        '''Sessions support the context manager protocol; the session is
+        closed on exit.'''
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        '''Close the session on exit; exceptions are not suppressed.'''
+        self.close()
+        return False
+%}
 };
 
 %extend __wt_connection {
     int _clear() {
         return (0);
     }
+
+%pythoncode %{
+    def __enter__(self):
+        '''Connections support the context manager protocol; the connection
+        is closed on exit.'''
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        '''Close the connection on exit; exceptions are not suppressed.'''
+        self.close(None)
+        return False
+%}
 };
 
 %define CONCAT(a,b)   a##b
