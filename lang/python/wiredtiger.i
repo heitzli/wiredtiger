@@ -1135,9 +1135,10 @@ typedef int int_void;
         return (keys[0], values[0])
 
     def set_key(self, *args):
-        '''set_key(self) -> None
+        '''set_key(self, *values) -> None
 
-        @copydoc WT_CURSOR::set_key'''
+        @copydoc WT_CURSOR::set_key
+        Pass one value per key column (composite keys pass one value per column, or a single tuple of values).'''
         if len(args) == 1 and type(args[0]) == tuple:
             args = args[0]
         if self.is_column:
@@ -1150,9 +1151,10 @@ typedef int int_void;
             self._set_key(self._key)
 
     def set_value(self, *args):
-        '''set_value(self) -> None
+        '''set_value(self, *values) -> None
 
-        @copydoc WT_CURSOR::set_value'''
+        @copydoc WT_CURSOR::set_value
+        Pass one value per value column (composite values pass one value per column, or a single tuple of values).'''
         if self.is_json:
             self._set_value_str(args[0])
         else:

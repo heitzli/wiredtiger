@@ -89,8 +89,7 @@ for _cls in ("Connection", "Session", "Cursor"):
          'exc_val: BaseException | None, exc_tb: Any) -> None: ...')
 for _key in (("Session", "create"), ("Session", "drop"),
              ("Session", "alter"), ("Session", "compact"),
-             ("Session", "salvage"), ("Session", "verify"),
-             ("Session", "truncate")):
+             ("Session", "salvage"), ("Session", "verify")):
     _SIGNATURE_LINES[_key] = \
         f'def {_key[1]}(self, uri: str, config: {_t} = ..., /) -> int: ...'
 for _key in (("Session", "reconfigure"), ("Session", "checkpoint"),
@@ -108,9 +107,9 @@ for _key in (("Cursor", "next"), ("Cursor", "prev"), ("Cursor", "reset"),
              ("Cursor", "equals")):
     _SIGNATURE_LINES[_key] = f'def {_key[1]}(self, *args: Any) -> int: ...'
 _SIGNATURE_LINES[("Cursor", "set_key")] = \
-    'def set_key(self, key: Any, /) -> None: ...'
+    'def set_key(self, *args: Any) -> None: ...'
 _SIGNATURE_LINES[("Cursor", "set_value")] = \
-    'def set_value(self, value: Any, /) -> None: ...'
+    'def set_value(self, *args: Any) -> None: ...'
 for _key in (("Cursor", "get_key"), ("Cursor", "get_value"),
              ("Cursor", "get_keys"), ("Cursor", "get_values"),
              ("Cursor", "get_raw_key_value")):
@@ -148,7 +147,7 @@ _SIGNATURE_LINES[("Session", "transaction_pinned_range")] = \
 _SIGNATURE_LINES[("Session", "prepared_id_transaction")] = \
     'def prepared_id_transaction(self, cursor: "Cursor | None" = ..., /) -> int: ...'
 _SIGNATURE_LINES[("Session", "bind_configuration")] = \
-    'def bind_configuration(self, uri: str, compiled: Any, /) -> int: ...'
+    'def bind_configuration(self, compiled: Any, /) -> int: ...'
 _SIGNATURE_LINES[("Session", "truncate")] = (
     f'def truncate(self, uri: {_t} = ..., start: "Cursor | None" = ..., '
     f'stop: "Cursor | None" = ..., config: {_t} = ..., /) -> int: ...')
@@ -165,7 +164,7 @@ _SIGNATURE_LINES[("Connection", "debug_info")] = \
 _SIGNATURE_LINES[("Connection", "load_extension")] = \
     f'def load_extension(self, path: str, config: {_t} = ..., /) -> int: ...'
 _SIGNATURE_LINES[("Connection", "compile_configuration")] = \
-    'def compile_configuration(self, config: str, type: int, prefix: str, /) -> Any: ...'
+    'def compile_configuration(self, method: str, config: str, /) -> Any: ...'
 _SIGNATURE_LINES[("Connection", "configure_method")] = (
     'def configure_method(self, method_name: str, uri: str, config: str, '
     'ok_to_process: int, session_method_check: str, /) -> int: ...')
